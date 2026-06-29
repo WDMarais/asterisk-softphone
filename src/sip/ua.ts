@@ -6,7 +6,7 @@
 // them onto AgentEvents and drives the FSM. This module owns SIP.js; nothing
 // else imports it.
 
-import { UserAgent, Registerer, RegistererState } from "sip.js";
+import type { UserAgent, Registerer } from "sip.js";
 import type { SoftphoneConfig } from "../config";
 
 export type RegistrationOutcome =
@@ -57,6 +57,10 @@ export class SipUa implements RegistrationClient {
     // never have registered, and SIP.js rejects unregister() in that case).
     await this.teardown();
 
+    // Load sip.js lazily so it stays out of the initial bundle (and out of the
+    // mock-mode graph entirely) — only a real registration pulls in the ~540kB dep.
+    const { UserAgent, Registerer, RegistererState } = await import("sip.js");
+
     const uri = UserAgent.makeURI(`sip:${this.config.sipUser}@${this.config.sipDomain}`);
     if (!uri) throw new Error(`invalid SIP URI for user ${this.config.sipUser}`);
 
@@ -102,11 +106,14 @@ export class SipUa implements RegistrationClient {
    * registered — only sends an un-REGISTER if we actually hold a registration.
    */
   async unregister(): Promise<void> {
-    if (this.registerer?.state === RegistererState.Registered) {
-      try {
-        await this.registerer.unregister();
-      } catch {
-        // best-effort; tear down regardless
+    if (this.registerer) {
+      const { RegistererState } = await import("sip.js");
+      if (this.registerer.state === RegistererState.Registered) {
+        try {
+          await this.registerer.unregister();
+        } catch {
+          // best-effort; tear down regardless
+        }
       }
     }
     await this.teardown();
