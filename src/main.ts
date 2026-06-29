@@ -8,7 +8,7 @@
 
 import "./ui/styles.css";
 import { defaultConfig, isMock } from "./config";
-import { mountRegistration } from "./ui/registration";
+import { mountApp } from "./ui/appShell";
 import { SipUa, type PhoneClientFactory } from "./sip/ua";
 import { MockSipUa } from "./sip/mockUa";
 
@@ -17,4 +17,4 @@ const makeClient: PhoneClientFactory = isMock
   : (config, onOutcome) => new SipUa(config, onOutcome);
 
 const app = document.querySelector<HTMLDivElement>("#app");
-if (app) mountRegistration(app, defaultConfig, makeClient);
+if (app) mountApp(app, defaultConfig, makeClient);

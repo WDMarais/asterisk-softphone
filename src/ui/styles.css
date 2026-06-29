@@ -1,14 +1,33 @@
 :root {
   color-scheme: light dark;
   font-family: system-ui, sans-serif;
+
+  /* Theme tokens — neutral/light for now. Restyling (incl. a dark mode) is a
+     matter of overriding these; nothing below hard-codes a palette colour. */
+  --bg-app: #e9ebef;
+  --bg-region: #ffffff;
+  --bg-rail: #f6f7f9;
+  --border: #e2e5ea;
+  --text: #1f2430;
+  --text-dim: #6b7280;
+  --accent: #2563eb;
+
+  /* Shell geometry — the rail/context column widths reflow at the breakpoints. */
+  --rail-w: 260px;
+  --context-w: 300px;
+}
+
+/* The shell fills the viewport, so the html/body/#app chain must carry height. */
+html,
+body,
+#app {
+  height: 100%;
 }
 
 body {
   margin: 0;
-  display: grid;
-  place-items: center;
-  min-height: 100vh;
-  background: #f4f5f7;
+  background: var(--bg-app);
+  color: var(--text);
 }
 
 .card {
@@ -103,4 +122,149 @@ h1 small {
 }
 .hint code {
   font-size: 0.7rem;
+}
+
+/* ============================================================================
+   App shell — first-principles desktop layout (see ui/appShell.ts).
+
+   grid-template-areas names the regions in a visual ASCII map, so the layout is
+   readable at a glance and reflows by re-drawing the map at each breakpoint.
+   `stage` and `context` repeat down rows 2-3 so they span full height while
+   `presence` tucks under the `rail` (bottom-left, Discord-style).
+   ============================================================================ */
+.app-shell {
+  height: 100%;
+  display: grid;
+  grid-template-columns: var(--rail-w) 1fr var(--context-w);
+  grid-template-rows: auto 1fr auto;
+  grid-template-areas:
+    "banner   banner banner"
+    "rail     stage  context"
+    "presence stage  context";
+}
+
+/* Grid items default to min-width/height:auto, which lets content force a cell
+   wider/taller than its track (the classic "grid blowout"). min-*:0 lets each
+   region clip and scroll its own content instead. */
+.region {
+  min-width: 0;
+  min-height: 0;
+  position: relative;
+  padding: 0.75rem;
+  overflow: auto;
+  background: var(--bg-region);
+  border: 0 solid var(--border);
+}
+
+.region--banner {
+  grid-area: banner;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  border-bottom-width: 1px;
+}
+.region--rail {
+  grid-area: rail;
+  background: var(--bg-rail);
+  border-right-width: 1px;
+}
+.region--stage {
+  grid-area: stage;
+  display: flex;
+  flex-direction: column;
+}
+.region--context {
+  grid-area: context;
+  background: var(--bg-rail);
+  border-left-width: 1px;
+}
+.region--presence {
+  grid-area: presence;
+  background: var(--bg-rail);
+  border-right-width: 1px;
+  border-top-width: 1px;
+}
+
+/* A small corner label so each empty region reads as an intentional stub. */
+.region__tag {
+  position: absolute;
+  top: 0.4rem;
+  right: 0.5rem;
+  font-size: 0.6rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  opacity: 0.65;
+}
+.region__note {
+  font-size: 0.75rem;
+  color: var(--text-dim);
+}
+
+/* Placeholder content — dashed, dim, centred: clearly "to be filled". */
+.placeholder {
+  display: grid;
+  place-content: center;
+  text-align: center;
+  gap: 0.4rem;
+  height: 100%;
+  margin: 0.5rem 0;
+  padding: 1rem;
+  border: 1px dashed var(--border);
+  border-radius: 10px;
+  color: var(--text-dim);
+  font-size: 0.85rem;
+}
+.placeholder--lead {
+  flex: 1;
+  font-size: 1rem;
+  color: var(--text);
+}
+.placeholder small {
+  color: var(--text-dim);
+  font-size: 0.78rem;
+}
+
+/* The registration card sits in the presence box — flatten it so it reads as a
+   panel in the shell rather than a floating card. */
+.region--presence .card {
+  width: auto;
+  padding: 0.5rem 0.25rem;
+  background: transparent;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+/* Tablet: drop the context panel first (least essential when narrow). */
+@media (max-width: 1024px) {
+  .app-shell {
+    grid-template-columns: var(--rail-w) 1fr;
+    grid-template-areas:
+      "banner   banner"
+      "rail     stage"
+      "presence stage";
+  }
+  .region--context {
+    display: none;
+  }
+}
+
+/* Mobile: single column — stage is the focus, presence drops to a bottom bar,
+   the activity rail is hidden (a drawer is a later slice). Dialing defers to the
+   hardware keyboard here, so no on-screen keypad is needed. */
+@media (max-width: 640px) {
+  .app-shell {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto 1fr auto;
+    grid-template-areas:
+      "banner"
+      "stage"
+      "presence";
+  }
+  .region--rail {
+    display: none;
+  }
+  .region--presence {
+    border-right-width: 0;
+  }
 }
