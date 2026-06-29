@@ -25,14 +25,19 @@ export interface SoftphoneConfig {
 // Sourced from Vite env (VITE_PBX_DOMAIN, set in a gitignored .env). No default
 // — the deployment domain must never live in source. Fail loud if unset.
 const PBX_DOMAIN = import.meta.env.VITE_PBX_DOMAIN;
-if (!PBX_DOMAIN) {
+
+// Mock mode (VITE_PBX_MOCK=1) swaps in a PBX-free RegistrationClient (see
+// sip/mockUa.ts), so it needs no real deployment domain. Real mode still fails
+// loud — the deployment domain must never live in source.
+export const isMock = import.meta.env.VITE_PBX_MOCK === "1";
+if (!PBX_DOMAIN && !isMock) {
   throw new Error("VITE_PBX_DOMAIN is not set — copy .env.example to .env and set it.");
 }
 
 export const defaultConfig: SoftphoneConfig = {
   wsServer: `${location.origin.replace(/^http/, "ws")}/ws`,
   sipUser: "6003",
-  sipDomain: PBX_DOMAIN,
+  sipDomain: PBX_DOMAIN ?? "mock.pbx.local",
   stunServers: ["stun:stun.l.google.com:19302"],
   autoRegister: true,
   retryN: 2,

@@ -14,13 +14,36 @@ export type RegistrationOutcome =
   | { kind: "failed"; reason: string }
   | { kind: "unregistered" };
 
-export class SipUa {
+/** Callback the UA invokes with each coarse registration outcome. */
+export type OutcomeListener = (outcome: RegistrationOutcome) => void;
+
+/**
+ * The narrow contract the registration controller depends on. SipUa is the real,
+ * sip.js-backed implementation; MockSipUa (sip/mockUa.ts) is the PBX-free one.
+ * The controller imports only this interface, so it never pulls in sip.js.
+ */
+export interface RegistrationClient {
+  register(password: string): Promise<void>;
+  unregister(): Promise<void>;
+}
+
+/**
+ * Builds a RegistrationClient from a config + outcome listener. Lets the
+ * composition root (main.ts) choose the real vs mock implementation while the
+ * controller stays agnostic.
+ */
+export type RegistrationClientFactory = (
+  config: SoftphoneConfig,
+  onOutcome: OutcomeListener,
+) => RegistrationClient;
+
+export class SipUa implements RegistrationClient {
   private ua: UserAgent | undefined;
   private registerer: Registerer | undefined;
 
   constructor(
     private readonly config: SoftphoneConfig,
-    private readonly onOutcome: (outcome: RegistrationOutcome) => void,
+    private readonly onOutcome: OutcomeListener,
   ) {}
 
   /**

@@ -4,7 +4,7 @@
 
 import { AgentState, AgentEvent } from "../fsm/agentState";
 import { AgentStateMachine } from "../fsm/machine";
-import { SipUa } from "../sip/ua";
+import type { RegistrationClientFactory } from "../sip/ua";
 import type { SoftphoneConfig } from "../config";
 
 // Badge colour per state — green = good, amber = transient, red = failed, grey = offline.
@@ -15,7 +15,11 @@ const BADGE_CLASS: Partial<Record<AgentState, string>> = {
   [AgentState.REGISTRATION_FAILED]: "badge-error",
 };
 
-export function mountRegistration(root: HTMLElement, config: SoftphoneConfig): void {
+export function mountRegistration(
+  root: HTMLElement,
+  config: SoftphoneConfig,
+  makeClient: RegistrationClientFactory,
+): void {
   const machine = new AgentStateMachine();
 
   // --- DOM ---
@@ -44,7 +48,7 @@ export function mountRegistration(root: HTMLElement, config: SoftphoneConfig): v
   const onlineBtn = root.querySelector<HTMLButtonElement>("#online")!;
   const offlineBtn = root.querySelector<HTMLButtonElement>("#offline")!;
 
-  const ua = new SipUa(config, (outcome) => {
+  const ua = makeClient(config, (outcome) => {
     // Map SIP outcomes onto FSM events — only when the current state expects them,
     // so stray SIP.js callbacks can't force an illegal transition.
     if (outcome.kind === "registered" && machine.state === AgentState.REGISTERING) {

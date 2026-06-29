@@ -9,6 +9,7 @@ import { defineConfig } from "vitest/config";
 export default defineConfig(({ command, mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
   const domain = env.VITE_PBX_DOMAIN;
+  const mock = env.VITE_PBX_MOCK === "1";
 
   const test = {
     globals: true,
@@ -16,11 +17,17 @@ export default defineConfig(({ command, mode }) => {
     include: ["src/**/*.test.ts"],
   };
 
+  // Mock mode has no PBX to proxy to and needs no deployment domain — the app
+  // uses MockSipUa and makes no /ws or control-plane requests.
+  if (mock) {
+    return { test };
+  }
+
   // Only the dev server needs the proxy; unit tests (`vitest`) must not require
   // deployment config, so fail loud only when actually serving.
   if (!domain) {
     if (command === "serve") {
-      throw new Error("VITE_PBX_DOMAIN is not set — copy .env.example to .env and set it.");
+      throw new Error("VITE_PBX_DOMAIN is not set — copy .env.example to .env and set it (or set VITE_PBX_MOCK=1).");
     }
     return { test };
   }
