@@ -18,26 +18,52 @@ export type RegistrationOutcome =
 export type OutcomeListener = (outcome: RegistrationOutcome) => void;
 
 /**
- * The narrow contract the registration controller depends on. SipUa is the real,
+ * Coarse outbound-call lifecycle events (spec §2.3). The controller maps these
+ * onto FSM events. Inbound (§2.4) and richer states arrive in later slices.
+ */
+export type CallEvent =
+  | { kind: "ringing"; destination: string }
+  | { kind: "answered" }
+  | { kind: "ended"; reason: string }
+  | { kind: "failed"; reason: string };
+
+/** Callback the UA invokes with each call-lifecycle event. */
+export type CallEventListener = (event: CallEvent) => void;
+
+/**
+ * The narrow contract the phone controller depends on. SipUa is the real,
  * sip.js-backed implementation; MockSipUa (sip/mockUa.ts) is the PBX-free one.
  * The controller imports only this interface, so it never pulls in sip.js.
+ *
+ * Registration outcomes go to the listener passed at construction; call events
+ * go to the listener registered via onCallEvent.
  */
-export interface RegistrationClient {
+export interface PhoneClient {
   register(password: string): Promise<void>;
   unregister(): Promise<void>;
+  /**
+   * Place an outbound call. Per spec §2.3 the real path is a broker Originate
+   * (Asterisk then rings the agent's own leg); the mock simulates the resulting
+   * lifecycle directly.
+   */
+  placeCall(destination: string): Promise<void>;
+  /** End the current or ringing call. */
+  hangup(): Promise<void>;
+  /** Subscribe to call-lifecycle events. */
+  onCallEvent(listener: CallEventListener): void;
 }
 
 /**
- * Builds a RegistrationClient from a config + outcome listener. Lets the
+ * Builds a PhoneClient from a config + registration-outcome listener. Lets the
  * composition root (main.ts) choose the real vs mock implementation while the
  * controller stays agnostic.
  */
-export type RegistrationClientFactory = (
+export type PhoneClientFactory = (
   config: SoftphoneConfig,
   onOutcome: OutcomeListener,
-) => RegistrationClient;
+) => PhoneClient;
 
-export class SipUa implements RegistrationClient {
+export class SipUa implements PhoneClient {
   private ua: UserAgent | undefined;
   private registerer: Registerer | undefined;
 
@@ -117,6 +143,22 @@ export class SipUa implements RegistrationClient {
       }
     }
     await this.teardown();
+  }
+
+  // Outbound calling (sip.js Inviter + WebRTC media) is the live-PBX
+  // scaffold-and-verify slice and isn't wired yet — MockSipUa backs the dialpad
+  // for now. These satisfy the PhoneClient contract and fail loud if a real
+  // build invokes them before that slice lands.
+  onCallEvent(_listener: CallEventListener): void {
+    // wired in the real-PBX outbound slice
+  }
+
+  async placeCall(_destination: string): Promise<void> {
+    throw new Error("outbound calling not implemented yet (real-PBX slice pending)");
+  }
+
+  async hangup(): Promise<void> {
+    throw new Error("hangup not implemented yet (real-PBX slice pending)");
   }
 
   /** Drop the UA/registerer locally. Network-free (no un-REGISTER) and never throws. */

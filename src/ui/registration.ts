@@ -4,7 +4,7 @@
 
 import { AgentState, AgentEvent } from "../fsm/agentState";
 import { AgentStateMachine } from "../fsm/machine";
-import type { RegistrationClientFactory } from "../sip/ua";
+import type { PhoneClientFactory } from "../sip/ua";
 import type { SoftphoneConfig } from "../config";
 
 // Badge colour per state — green = good, amber = transient, red = failed, grey = offline.
@@ -13,12 +13,21 @@ const BADGE_CLASS: Partial<Record<AgentState, string>> = {
   [AgentState.REGISTERING]: "badge-pending",
   [AgentState.AVAILABLE]: "badge-ok",
   [AgentState.REGISTRATION_FAILED]: "badge-error",
+  [AgentState.RINGING_OUT]: "badge-pending",
+  [AgentState.IN_CALL]: "badge-ok",
 };
+
+// States from which an "ended" call event should drive CALL_ENDED (§1.3 table).
+const ON_CALL_STATES: ReadonlySet<AgentState> = new Set([
+  AgentState.RINGING_OUT,
+  AgentState.IN_CALL,
+  AgentState.ON_HOLD,
+]);
 
 export function mountRegistration(
   root: HTMLElement,
   config: SoftphoneConfig,
-  makeClient: RegistrationClientFactory,
+  makeClient: PhoneClientFactory,
 ): void {
   const machine = new AgentStateMachine();
 
@@ -58,6 +67,22 @@ export function mountRegistration(
       machine.dispatch(AgentEvent.REGISTER_FAIL);
     }
     // "unregistered" needs no dispatch — Go Offline already moved the FSM.
+  });
+
+  // Map outbound call lifecycle (spec §2.3) onto FSM events. The dialpad (next
+  // slice) dispatches INITIATE_CALL and calls ua.placeCall; these events drive
+  // the rest of the flow. Guarded by state so a stray event can't force an
+  // illegal transition.
+  ua.onCallEvent((event) => {
+    if (event.kind === "answered" && machine.state === AgentState.RINGING_OUT) {
+      machine.dispatch(AgentEvent.ANSWERED);
+    } else if (event.kind === "failed" && machine.state === AgentState.RINGING_OUT) {
+      reason.textContent = `Call failed — ${event.reason}`;
+      machine.dispatch(AgentEvent.CALL_ENDED);
+    } else if (event.kind === "ended" && ON_CALL_STATES.has(machine.state)) {
+      machine.dispatch(AgentEvent.CALL_ENDED);
+    }
+    // "ringing" is informational — INITIATE_CALL already moved us to RINGING_OUT.
   });
 
   // --- render on every state change ---

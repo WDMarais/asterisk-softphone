@@ -9,10 +9,10 @@
 import "./ui/styles.css";
 import { defaultConfig, isMock } from "./config";
 import { mountRegistration } from "./ui/registration";
-import { SipUa, type RegistrationClientFactory } from "./sip/ua";
+import { SipUa, type PhoneClientFactory } from "./sip/ua";
 import { MockSipUa } from "./sip/mockUa";
 
-const makeClient: RegistrationClientFactory = isMock
+const makeClient: PhoneClientFactory = isMock
   ? (config, onOutcome) => new MockSipUa(config, onOutcome)
   : (config, onOutcome) => new SipUa(config, onOutcome);
 
